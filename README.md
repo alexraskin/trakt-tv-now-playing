@@ -2,7 +2,7 @@
 
 Simple API to check what a Trakt.tv user is currently watching.
 
-[![trakt.tv Now Playing](https://img.shields.io/endpoint?color=blueviolet&url=https://trakt.alexraskin.com/alexraskin?format=shields.io)](https://trakt.alexraskin.com/alexraskin)
+[![trakt.tv Now Playing](https://img.shields.io/endpoint?url=https://trakt.alexraskin.com/alexraskin?format=shields.io)](https://trakt.alexraskin.com/alexraskin)
 
 
 ## Running the API
