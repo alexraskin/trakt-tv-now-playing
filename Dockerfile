@@ -26,15 +26,17 @@ WORKDIR /app
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
 
-# Create data directory for persistence
+# Create data directory and set permissions
 RUN mkdir -p /data && \
-    chown -R nobody:nobody /data
+    chmod 777 /data && \
+    adduser -D -u 1000 appuser && \
+    chown appuser:appuser /data
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
 
-# Use nobody user
-USER nobody
+# Switch to appuser
+USER appuser
 
 # Set token file path to use the persistent volume
 ENV TOKEN_FILE=/data/token.json
