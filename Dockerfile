@@ -27,13 +27,13 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates
 
 # Create data directory, user, and initial token file with proper permissions
-RUN mkdir -p /data && \
-    chmod 777 /data && \
+RUN mkdir -p /app/data && \
+    chmod 777 /app/data && \
     adduser -D -u 1000 appuser && \
-    chown appuser:appuser /data && \
-    echo '{}' > /data/token.json && \
-    chown appuser:appuser /data/token.json && \
-    chmod 666 /data/token.json
+    chown appuser:appuser /app/data && \
+    echo '{}' > /app/data/token.json && \
+    chown appuser:appuser /app/data/token.json && \
+    chmod 666 /app/data/token.json
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
@@ -42,7 +42,7 @@ COPY --from=builder /app/main .
 USER appuser
 
 # Set token file path to use the persistent volume
-ENV TOKEN_FILE=/data/token.json
+ENV TOKEN_FILE=/app/data/token.json
 
 # Expose the application port
 EXPOSE 8080

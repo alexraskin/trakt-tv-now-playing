@@ -9,4 +9,4 @@ healthcheckTimeout = 100
 
 [[mounts]]
 source = "data"
-destination = "/data" 
+destination = "/app/data" 
