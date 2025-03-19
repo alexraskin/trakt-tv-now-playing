@@ -1,16 +1,14 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
-
-	"github.com/alexraskin/trakt-tv-now-playing/handlers"
-	"github.com/alexraskin/trakt-tv-now-playing/middleware"
-	"github.com/alexraskin/trakt-tv-now-playing/models"
-	"github.com/alexraskin/trakt-tv-now-playing/service"
-	"github.com/alexraskin/trakt-tv-now-playing/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
@@ -19,55 +17,10 @@ import (
 
 func main() {
 
-	models.Credentials = models.Config{
-		ClientID:     os.Getenv("TRAKT_CLIENT_ID"),
-		ClientSecret: os.Getenv("TRAKT_CLIENT_SECRET"),
-		AdminKey:     os.Getenv("ADMIN_KEY"),
+	apiKey := os.Getenv("TRAKT_CLIENT_ID")
+	if apiKey == "" {
+		log.Fatal("TRAKT_CLIENT_ID is not set")
 	}
-
-	if models.Credentials.ClientID == "" || models.Credentials.ClientSecret == "" {
-		log.Fatal("TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET must be set")
-	}
-
-	if models.Credentials.AdminKey == "" {
-		log.Fatal("ADMIN_KEY must be set")
-	}
-
-	err := utils.LoadToken()
-	if err == nil && models.AccessToken != "" {
-		fmt.Println("Loaded existing access token")
-
-		// Check if token is expired or will expire soon (within 1 hour)
-		if time.Now().Add(time.Hour).After(models.TokenExpiry) && models.RefreshToken != "" {
-			fmt.Println("Token expired or will expire soon, attempting to refresh...")
-			err := service.RefreshAccessToken()
-			if err != nil {
-				fmt.Printf("Failed to refresh token: %v\n", err)
-			} else {
-				fmt.Println("Access token refreshed successfully")
-			}
-		}
-	} else {
-		fmt.Println("No valid access token found. Use /admin/auth to authorize the application")
-	}
-
-	// refresh the token every 23 hours (tokens last 24 hours)
-	go func() {
-		for {
-			// Sleep for 23 hours
-			time.Sleep(23 * time.Hour)
-
-			if models.RefreshToken != "" {
-				fmt.Println("Performing scheduled token refresh...")
-				err := service.RefreshAccessToken()
-				if err != nil {
-					fmt.Printf("Scheduled token refresh failed: %v\n", err)
-				} else {
-					fmt.Println("Scheduled token refresh successful")
-				}
-			}
-		}
-	}()
 
 	app := fiber.New()
 
@@ -91,12 +44,89 @@ func main() {
 		return c.SendString("Trakt.tv Now Playing API")
 	})
 
-	app.Get("/:username", handlers.HandleCheckWatching)
-
-	admin := app.Group("/admin", middleware.AdminAuth())
-	admin.Get("/auth", handlers.HandleAuth)
-	admin.Get("/status", handlers.HandleAuthStatus)
-	admin.Get("/refresh", handlers.HandleRefreshToken)
+	app.Get("/:username", func(c *fiber.Ctx) error {
+		return handleCheckWatching(c, apiKey)
+	})
 
 	app.Listen(":8080")
+}
+
+func handleCheckWatching(c *fiber.Ctx, traktApiKey string) error {
+	username := c.Params("username")
+	format := c.Query("format")
+
+	if username == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Username is required",
+		})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.trakt.tv/users/"+username+"/watching", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Add("trakt-api-key", traktApiKey)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("trakt-api-version", "2")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		if format == "shields.io" {
+			return c.JSON(fiber.Map{
+				"schemaVersion": 1,
+				"label":         "Currently Watching",
+				"message":       "Nothing",
+				"color":         "red",
+			})
+		}
+		return c.JSON(fiber.Map{
+			"watching": false,
+		})
+	}
+
+	var watchingResponse TraktWatchingResponse
+	if err := json.Unmarshal(body, &watchingResponse); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	if format == "shields.io" {
+		message := "Nothing"
+		if watchingResponse.Movie != nil {
+			message = watchingResponse.Movie.Title
+		} else if watchingResponse.Show != nil {
+			if watchingResponse.Episode != nil {
+				message = fmt.Sprintf("%s S%02dE%02d",
+					watchingResponse.Show.Title,
+					watchingResponse.Episode.Season,
+					watchingResponse.Episode.Number)
+			} else {
+				message = watchingResponse.Show.Title
+			}
+		}
+
+		return c.JSON(fiber.Map{
+			"schemaVersion": 1,
+			"label":         "Currently Watching",
+			"message":       message,
+			"color":         "green",
+		})
+	}
+
+	return c.JSON(watchingResponse)
 }
