@@ -1,0 +1,19 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Application
+token.json
+*.log
+
+# IDE
+.vscode
+.idea
+
+# Build
+bin/
+tmp/ 
