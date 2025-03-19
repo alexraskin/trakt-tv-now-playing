@@ -26,11 +26,14 @@ WORKDIR /app
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
 
-# Create data directory and set permissions
+# Create data directory, user, and initial token file with proper permissions
 RUN mkdir -p /data && \
     chmod 777 /data && \
     adduser -D -u 1000 appuser && \
-    chown appuser:appuser /data
+    chown appuser:appuser /data && \
+    echo '{}' > /data/token.json && \
+    chown appuser:appuser /data/token.json && \
+    chmod 666 /data/token.json
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
