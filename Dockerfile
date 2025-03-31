@@ -1,29 +1,33 @@
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
 
-WORKDIR /app
+WORKDIR /build
 
 COPY go.mod go.sum ./
-
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION
+ARG COMMIT
+ARG BUILD_TIME
 
-FROM alpine:latest
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 \
+    GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
+    go build -ldflags="-X 'main.version=$VERSION' -X 'main.commit=$COMMIT' -X 'main.buildTime=$BUILD_TIME'" -o trakt-tv-now-playing github.com/alexraskin/trakt-tv-now-playing
 
-WORKDIR /app
+FROM alpine
 
 RUN apk --no-cache add ca-certificates
 
-RUN adduser -D -u 1000 appuser
+COPY --from=build /build/trakt-tv-now-playing /bin/trakt-tv-now-playing
 
-COPY --from=builder /app/main .
+EXPOSE 4000
 
-RUN chown appuser:appuser /app/main
+ENTRYPOINT ["/bin/trakt-tv-now-playing"]
 
-USER appuser
-
-EXPOSE 8080
-
-CMD ["./main"] 
+CMD ["-port", "4000"]

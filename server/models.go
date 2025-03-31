@@ -1,4 +1,4 @@
-package main
+package server
 
 type TraktTokenResponse struct {
 	AccessToken  string `json:"access_token"`
