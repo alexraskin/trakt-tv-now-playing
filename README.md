@@ -17,14 +17,14 @@ docker build -t trakt-now-playing .
 # Run the container
 docker run -d \
   -p 8080:8080 \
-  -e TRAKT_CLIENT_ID=your_api_key \
+  -e TRAKT_API_KEY=your_client_id \
   --name trakt-now-playing \
   trakt-now-playing
 ```
 
 ### Local Development
 ```
-export TRAKT_CLIENT_ID=your_client_id
+export TRAKT_API_KEY=your_client_id
 go run main.go
 ```
 
