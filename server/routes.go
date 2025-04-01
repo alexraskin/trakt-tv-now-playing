@@ -39,7 +39,7 @@ func (s *Server) Routes() http.Handler {
 	))
 
 	r.Get("/", s.index)
-
+	r.Get("/version", s.serverVersion)
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -49,6 +49,11 @@ func (s *Server) Routes() http.Handler {
 	r.NotFound(s.notFound)
 
 	return r
+}
+
+func (s *Server) serverVersion(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(s.version))
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
