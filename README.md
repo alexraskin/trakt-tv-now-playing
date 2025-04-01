@@ -2,6 +2,8 @@
 
 Simple API to check what a Trakt.tv user is currently watching.
 
+[![Image from Gyazo](https://i.gyazo.com/034ad27b9ebe8665cc5bce96b264ce65.png)](https://gyazo.com/034ad27b9ebe8665cc5bce96b264ce65)
+
 [![trakt.tv Now Playing](https://img.shields.io/endpoint?url=https://trakt.alexraskin.com/twizycat?format=shields.io)](https://github.com/alexraskin/trakt-tv-now-playing)
 
 
@@ -16,7 +18,7 @@ docker build -t trakt-now-playing .
 
 # Run the container
 docker run -d \
-  -p 8080:8080 \
+  -p 4000:4000 \
   -e TRAKT_API_KEY=your_client_id \
   --name trakt-now-playing \
   trakt-now-playing

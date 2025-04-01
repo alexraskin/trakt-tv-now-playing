@@ -3,10 +3,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"time"
+
+	"log/slog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -58,7 +58,7 @@ func (s *Server) serverVersion(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Hello, World!"))
+	w.Write([]byte("Trakt TV Now Playing"))
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
@@ -74,32 +74,19 @@ func (s *Server) handleCheckWatching(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest("GET", "https://api.trakt.tv/users/"+username+"/watching", nil)
+	body, err := s.getTraktUser(r.Context(), username)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error("Error creating request", slog.Any("err", err))
-		return
-	}
-	req.Header.Add("trakt-api-key", s.traktApiKey)
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("trakt-api-version", "2")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error("Error sending request", slog.Any("err", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error("Error reading response body", slog.Any("err", err))
+		switch err.Error() {
+		case "user not found":
+			http.Error(w, "User not found", http.StatusNotFound)
+		default:
+			slog.Error("Error fetching Trakt user data", slog.Any("err", err))
+			http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+		}
 		return
 	}
 
-	if resp.StatusCode == http.StatusNoContent {
+	if body == (TraktWatchingResponse{}) {
 		if format == "shields.io" {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"schemaVersion": 1, "label": "Currently Watching", "message": "Nothing", "color": "red"}`))
@@ -110,25 +97,18 @@ func (s *Server) handleCheckWatching(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var watchingResponse TraktWatchingResponse
-	if err := json.Unmarshal(body, &watchingResponse); err != nil {
-		slog.Error("Error unmarshalling response body", slog.Any("err", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	if format == "shields.io" {
 		message := "Nothing"
-		if watchingResponse.Movie != nil {
-			message = watchingResponse.Movie.Title
-		} else if watchingResponse.Show != nil {
-			if watchingResponse.Episode != nil {
+		if body.Movie != nil {
+			message = body.Movie.Title
+		} else if body.Show != nil {
+			if body.Episode != nil {
 				message = fmt.Sprintf("%s S%02dE%02d",
-					watchingResponse.Show.Title,
-					watchingResponse.Episode.Season,
-					watchingResponse.Episode.Number)
+					body.Show.Title,
+					body.Episode.Season,
+					body.Episode.Number)
 			} else {
-				message = watchingResponse.Show.Title
+				message = body.Show.Title
 			}
 		}
 
@@ -137,6 +117,6 @@ func (s *Server) handleCheckWatching(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(body)
 }
