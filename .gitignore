@@ -39,3 +39,5 @@ dist/
 tmp/
 
 token.json
+
+build.sh
