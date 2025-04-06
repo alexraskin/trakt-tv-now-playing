@@ -51,4 +51,4 @@ jobs:
           url: "https://swarmctl.alexraskin.com/v1/update/trakt_api?image=ghcr.io/alexraskin/trakt-tv-now-playing:${{ github.sha }}"
           method: "POST"
           timeout: 60000
-          customHeaders: '{"Authorization": "${{ secrets.AUTH_TOKEN }}"}'
+          customHeaders: '{"Authorization": "Bearer ${{ secrets.AUTH_TOKEN }}"}'
